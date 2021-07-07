@@ -43,19 +43,25 @@ def check_professor_availability(start_time, end_time, course, professor):
     if(course in professor.course.all()):
         print("professor teaches course")
         day = professor.dayavailability_set.all().filter(day=start_time.strftime("%w"))
-        if(start_time.time() >= day[0].start_time and end_time.time() <= day[0].end_time):
-            temp = (start_time.isoweekday()+1)%6 
-            sessions = Session.objects.filter(start_time__week_day=temp,  professor=professor)
-            print("all sessions", sessions)
-            for sess in sessions:
-                print("session", sess)
-                if (sess.start_time.strftime('%H:%M') <= start_time.strftime('%H:%M') and start_time.strftime('%H:%M') <= sess.end_time.strftime('%H:%M')) or (sess.start_time.strftime('%H:%M') <= end_time.strftime('%H:%M') and end_time.strftime('%H:%M') <= sess.end_time.strftime('%H:%M')):
-                    print("this session is within the professor's schedule, however it is in a conflict with an already existing session")
+        if day:
+            if(start_time.time() >= day[0].start_time and end_time.time() <= day[0].end_time):
+                temp = (start_time.isoweekday()+1)%6 
+                sessions = Session.objects.filter(start_time__week_day=temp,  professor=professor)
+                print("all sessions", sessions)
+                for sess in sessions:
+                    print("session", sess)
+                    if (sess.start_time.strftime('%H:%M') <= start_time.strftime('%H:%M') and start_time.strftime('%H:%M') <= sess.end_time.strftime('%H:%M')) or (sess.start_time.strftime('%H:%M') <= end_time.strftime('%H:%M') and end_time.strftime('%H:%M') <= sess.end_time.strftime('%H:%M')):
+                        print("this session is within the professor's schedule, however it is in a conflict with an already existing session")
+                        return 0
+            else:
+                    print("The professor will not be available during the session")
                     return 0
         else:
-                print("The professor will not be available during the session")
+            print("the professor does not teach in this day")
+            return 0
     else:
         print("Professor doesn't teach the course")
+        return 0
     return 1
 
 class CalendarView(LoginRequiredMixin, generic.ListView):
