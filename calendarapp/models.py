@@ -52,7 +52,7 @@ class Venue(models.Model):
 
 class Session(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
-    professor = models.ForeignKey(Professor, on_delete=models.CASCADE)
+    professor = models.ForeignKey(Professor, on_delete=models.CASCADE, blank=True, null=True)
     title = models.CharField(max_length=200, unique=True)
     description = models.TextField()
     start_time = models.DateTimeField()
