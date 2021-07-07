@@ -43,20 +43,58 @@ def check_professor_availability(start_time, end_time, course, professor):
     if(course in professor.course.all()):
         print("professor teaches course")
         day = professor.dayavailability_set.all().filter(day=start_time.strftime("%w"))
-        if(start_time.time() >= day[0].start_time and end_time.time() <= day[0].end_time):
-            temp = (start_time.isoweekday()+1)%6 
-            sessions = Session.objects.filter(start_time__week_day=temp,  professor=professor)
-            print("all sessions", sessions)
-            for sess in sessions:
-                print("session", sess)
-                if (sess.start_time.strftime('%H:%M') <= start_time.strftime('%H:%M') and start_time.strftime('%H:%M') <= sess.end_time.strftime('%H:%M')) or (sess.start_time.strftime('%H:%M') <= end_time.strftime('%H:%M') and end_time.strftime('%H:%M') <= sess.end_time.strftime('%H:%M')):
-                    print("this session is within the professor's schedule, however it is in a conflict with an already existing session")
+        if day:
+            if(start_time.time() >= day[0].start_time and end_time.time() <= day[0].end_time):
+                temp = (start_time.isoweekday()+1)%6 
+                sessions = Session.objects.filter(start_time__week_day=temp,  professor=professor)
+                print("all sessions", sessions)
+                for sess in sessions:
+                    print("session", sess)
+                    if (sess.start_time.strftime('%H:%M') <= start_time.strftime('%H:%M') and start_time.strftime('%H:%M') <= sess.end_time.strftime('%H:%M')) or (sess.start_time.strftime('%H:%M') <= end_time.strftime('%H:%M') and end_time.strftime('%H:%M') <= sess.end_time.strftime('%H:%M')):
+                        print("this session is within the professor's schedule, however it is in a conflict with an already existing session")
+                        return 0
+            else:
+                    print("The professor will not be available during the session")
                     return 0
         else:
-                print("The professor will not be available during the session")
+            print("the professor does not teach in this day")
+            return 0
     else:
         print("Professor doesn't teach the course")
+        return 0
     return 1
+
+def assign_session_to_professor(session):
+    print("in assign professor", type(session))
+    professors = Professor.objects.filter(course=session.course).order_by('rank')
+    print(professors)
+    for prof in professors:
+        flag = 1
+        print("professor", prof)
+        day = prof.dayavailability_set.all().filter(day=session.start_time.strftime("%w"))
+        if day:
+            if(session.start_time.time() >= day[0].start_time and session.end_time.time() <= day[0].end_time):
+                #temp = (session.start_time.isoweekday()+1)%6 
+                sessions = Session.objects.filter(start_time__date=session.start_time.date(),  professor=prof)
+                print("all sessions", sessions)
+                for sess in sessions:
+                    print("session", sess)
+                    if (sess.start_time.strftime('%H:%M') <= session.start_time.strftime('%H:%M') and session.start_time.strftime('%H:%M') <= sess.end_time.strftime('%H:%M')) or (sess.start_time.strftime('%H:%M') <= session.end_time.strftime('%H:%M') and session.end_time.strftime('%H:%M') <= sess.end_time.strftime('%H:%M')):
+                        print("this session is within the professor's schedule, however it is in a conflict with an already existing session")
+                        flag = 0
+                        break
+            else:
+                    print("The professor will not be available during the session")
+                    flag = 0
+        else:
+            print("the professor does not teach in this day")
+            flag = 0
+
+        if flag == 1:
+            print("professor", prof.name, "was assigned this session")
+            return flag, prof
+    return 0, None
+        
 
 class CalendarView(LoginRequiredMixin, generic.ListView):
     login_url = 'signup'
@@ -74,6 +112,30 @@ class CalendarView(LoginRequiredMixin, generic.ListView):
         context['next_month'] = next_month(d)
         return context
 
+# @login_required(login_url='signup')
+# def create_session(request):    
+#     form = SessionForm(request.POST or None)
+#     if request.POST and form.is_valid():
+#         title = form.cleaned_data['title']
+#         description = form.cleaned_data['description']
+#         start_time = form.cleaned_data['start_time']
+#         end_time = form.cleaned_data['end_time']
+#         course = form.cleaned_data["course"]
+#         professor = form.cleaned_data['professor']
+#         flag = check_professor_availability(start_time, end_time, course, professor)
+#         if flag == 1:
+#             print("there is no conflict with any of the professor's sessions")
+#             Session.objects.get_or_create(
+#                 course=course,
+#                 professor=professor,
+#                 title=title,
+#                 description=description,
+#                 start_time=start_time,
+#                 end_time=end_time
+#             )
+#             return HttpResponseRedirect(reverse('calendarapp:calendar'))
+#     return render(request, 'event.html', {'form': form})
+
 @login_required(login_url='signup')
 def create_session(request):    
     form = SessionForm(request.POST or None)
@@ -83,33 +145,25 @@ def create_session(request):
         start_time = form.cleaned_data['start_time']
         end_time = form.cleaned_data['end_time']
         course = form.cleaned_data["course"]
-        professor = form.cleaned_data['professor']
-        flag = check_professor_availability(start_time, end_time, course, professor)
-        if flag == 1:
-            print("there is no conflict with any of the professor's sessions")
-            Session.objects.get_or_create(
-                course=course,
-                professor=professor,
-                title=title,
-                description=description,
-                start_time=start_time,
-                end_time=end_time
-            )
-            return HttpResponseRedirect(reverse('calendarapp:calendar'))
-    return render(request, 'event.html', {'form': form})
 
-"""@login_required(login_url='signup')
-def create_event(request):
-    form = EventForm(request.POST or None)
-    if form.is_valid():
-        form.cleaned_data['user'] = request.user
-        form.save()
-        form = EventForm()
-    context = {
-        "form": form
-    }
-    return render(request, 'event.html', context)
-"""
+        Session.objects.get_or_create(
+            course=course,
+            title=title,
+            description=description,
+            start_time=start_time,
+            end_time=end_time
+        )
+        session = Session.objects.get(title=title)
+        print("in create session", type(session))
+        flag, professor = assign_session_to_professor(session)
+        if flag == 1:
+            session.professor = professor
+            session.save()
+            print("Successful assignment")
+        else: 
+            print("no professor was assigned to session")
+        return HttpResponseRedirect(reverse('calendarapp:calendar'))
+    return render(request, 'event.html', {'form': form})
 
 @login_required(login_url='singup')
 def create_course(request):
@@ -157,48 +211,6 @@ def create_professor(request):
         # prof.course.add(course) 
         return redirect('calendarapp:calendar')
     return render(request, 'add_member.html', {"form": forms})
-
-"""def assign_professor(request, session_id):
-    forms = AddProfessorForm()
-    if request.method == 'POST':
-        forms = AddProfessorForm(request.POST)
-        if forms.is_valid():
-            session = Session.objects.get(id=session_id)
-            name = forms.cleaned_data['name']
-            start_time = forms.cleaned_data['start_time']
-            end_time = forms.cleaned_data['end_time']
-            if session.start_time <= start_time and session.end_time >= end_time:
-                Professor.objects.get_or_create(
-                    event=session,
-                    name=name,
-                    start_time=start_time,
-                    end_time=end_time 
-                )
-                em = Professor.objects.filter(event=session_id)
-                print(em[0].session.title)
-                return redirect('calendarapp:calendar')
-            else:
-                print('--------------Member is not available during this time---------------')
-        else: 
-            print(forms.errors.as_data())
-    context = {
-        'form': forms
-    }
-    return render(request, 'add_member.html', context)"""
-
-"""def assign_prof_to_session(request, session_id):
-    session = Session.objects.get(id=session_id)
-    course = session.course
-    professors = Professor.objects.filter(course=course, start_time__lte=session.start_time, end_time__gte=session.end_time)
-    if professors.count > 0:
-        Professor.objects.update_or_create(
-
-        )
-    context = {
-        'professors': professors
-    }
-    return render
-"""
 
 def create_availablity(request):
     form = DayAvailabilityForm(request.POST or None)
