@@ -10,18 +10,45 @@ class Course(models.Model):
     title = models.CharField(max_length=50, unique=True)
     code = models.CharField(max_length=10, unique=True)
 
+    def __str__(self):
+        return str(self.title)
+
 class Professor(models.Model):
+    RANK_CHOICES = (
+        ('1', 'Rank 1'),
+        ('2', 'Rank 2'),
+        ('3', 'Rank 3'),
+    )
     name = models.CharField(max_length=100)
-    start_time = models.DateTimeField()
-    end_time = models.DateTimeField()
     course= models.ManyToManyField(Course)
+    rank = models.CharField(max_length=6, choices=RANK_CHOICES, default='1')
     created_date = models.DateTimeField(default=datetime.now)
 
-    class Meta:
-        unique_together = ['event', 'name']
+    def __str__(self):
+        return str(self.name)
+
+class DayAvailability(models.Model):
+    DAY_CHOICES = (
+        ('1', 'Monday'),
+        ('2', 'Tuesday'),
+        ('3', 'Wednesday'),
+        ('4', 'Thursday'),
+        ('5', 'Friday'),
+        ('6', 'Saturday'),
+        ('0', 'Sunday'),
+    )
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    day = models.CharField(max_length=15, choices=DAY_CHOICES)
+    professor = models.ForeignKey(Professor, on_delete=models.CASCADE)
 
     def __str__(self):
-        return str(self.user)
+        return str(self.day)
+    
+
+class Venue(models.Model):
+    location = models.CharField(max_length=50)
+    courses = models.ManyToManyField(Course)
 
 class Session(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
@@ -33,7 +60,7 @@ class Session(models.Model):
     created_date = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return self.title
+        return (self.title)
     
     def get_absolute_url(self):
         return reverse('calendarapp:event-detail', args=(self.id,))
