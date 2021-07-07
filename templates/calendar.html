@@ -1,8 +1,10 @@
 {% extends 'base.html' %} {% block content %}
-<div class="clearfix">
+<div>
   <span class="left m-2" style="font-size: 20px"
-    >Wellcome, {{ request.user }}</span
+    >Welcome, {{ request.user }}</span
   >
+</div>
+<div class="clearfix">
   <a class="btn btn-info right" href="{% url 'logout' %}"> Logout </a>
   <a
     class="btn btn-info right mr-2"
@@ -16,8 +18,17 @@
   >
     << Previous Month
   </a>
-  <a class="btn btn-info right mr-2" href="{% url 'calendarapp:event_new' %}">
-    + New Event
+  <a class="btn btn-info right mr-2" href="{% url 'calendarapp:session_new' %}">
+    + New Session
+  </a>
+  <a class="btn btn-info right mr-2" href="{% url 'calendarapp:course_new' %}">
+    + New Course
+  </a>
+  <a class="btn btn-info right mr-2" href="{% url 'calendarapp:professor_new' %}">
+    + New Professor
+  </a>
+  <a class="btn btn-info right mr-2" href="{% url 'calendarapp:availability_new' %}">
+    + New Availability
   </a>
 </div>
 <div style="color: blueviolet">{{ calendar }}</div>
