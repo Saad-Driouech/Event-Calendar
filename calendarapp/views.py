@@ -12,10 +12,9 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
 
-
 from .models import *
 from .utils import Calendar
-from .forms import AddProfessorForm, SessionForm
+from .forms import AddProfessorForm, DayAvailabilityForm, SessionForm, AddCourseFrom
 
 @login_required(login_url='signup')
 def index(request):
@@ -39,6 +38,25 @@ def next_month(d):
     next_month = last + timedelta(days=1)
     month = 'month=' + str(next_month.year) + '-' + str(next_month.month)
     return month
+
+def check_professor_availability(start_time, end_time, course, professor):
+    if(course in professor.course.all()):
+        print("professor teaches course")
+        day = professor.dayavailability_set.all().filter(day=start_time.strftime("%w"))
+        if(start_time.time() >= day[0].start_time and end_time.time() <= day[0].end_time):
+            temp = (start_time.isoweekday()+1)%6 
+            sessions = Session.objects.filter(start_time__week_day=temp,  professor=professor)
+            print("all sessions", sessions)
+            for sess in sessions:
+                print("session", sess)
+                if (sess.start_time.strftime('%H:%M') <= start_time.strftime('%H:%M') and start_time.strftime('%H:%M') <= sess.end_time.strftime('%H:%M')) or (sess.start_time.strftime('%H:%M') <= end_time.strftime('%H:%M') and end_time.strftime('%H:%M') <= sess.end_time.strftime('%H:%M')):
+                    print("this session is within the professor's schedule, however it is in a conflict with an already existing session")
+                    return 0
+        else:
+                print("The professor will not be available during the session")
+    else:
+        print("Professor doesn't teach the course")
+    return 1
 
 class CalendarView(LoginRequiredMixin, generic.ListView):
     login_url = 'signup'
@@ -65,18 +83,22 @@ def create_session(request):
         start_time = form.cleaned_data['start_time']
         end_time = form.cleaned_data['end_time']
         course = form.cleaned_data["course"]
-        Session.objects.filter(start_time=start_time, end_time=end_time)
-        Session.objects.get_or_create(
-            course=course,
-            title=title,
-            description=description,
-            start_time=start_time,
-            end_time=end_time
-        )
-        return HttpResponseRedirect(reverse('calendarapp:calendar'))
+        professor = form.cleaned_data['professor']
+        flag = check_professor_availability(start_time, end_time, course, professor)
+        if flag == 1:
+            print("there is no conflict with any of the professor's sessions")
+            Session.objects.get_or_create(
+                course=course,
+                professor=professor,
+                title=title,
+                description=description,
+                start_time=start_time,
+                end_time=end_time
+            )
+            return HttpResponseRedirect(reverse('calendarapp:calendar'))
     return render(request, 'event.html', {'form': form})
-"""
-@login_required(login_url='signup')
+
+"""@login_required(login_url='signup')
 def create_event(request):
     form = EventForm(request.POST or None)
     if form.is_valid():
@@ -89,6 +111,20 @@ def create_event(request):
     return render(request, 'event.html', context)
 """
 
+@login_required(login_url='singup')
+def create_course(request):
+    form = AddCourseFrom(request.POST or None)
+    if request.POST and form.is_valid():
+        title=form.cleaned_data['title']
+        code=form.cleaned_data['code']
+        Course.objects.get_or_create(
+            title=title,
+            code=code
+        )
+        return HttpResponseRedirect(reverse('calendarapp:calendar'))
+    return render(request, "course.html", {"form": form})
+
+
 class SessionEdit(generic.UpdateView):
     model = Session
     fields = ['professor', 'course', 'title', 'description', 'start_time', 'end_time']
@@ -96,38 +132,33 @@ class SessionEdit(generic.UpdateView):
 
 @login_required(login_url='signup')
 def session_details(request, event_id):
-    event = Session.objects.get(id=event_id)
-    professor = Professor.objects.filter(event=event)
+    session = Session.objects.get(id=event_id)
+    professor = Professor.objects.filter(session=session)
     context = {
-        'event': event,
+        'event': session,
         'professor': professor
     }
     return render(request, 'event-details.html', context)
 
 def create_professor(request):
-    forms = AddProfessorForm()
-    if request.method == 'POST':
-        forms = AddProfessorForm(request.POST)
-        if forms.is_valid():
-            name = forms.cleaned_data['name']
-            start_time = forms.cleaned_data['start_time']
-            end_time = forms.cleaned_data['end_time']
-            course = forms.cleaned_data['course']
-            Professor.objects.get_or_create(
-                course=course,
-                name=name,
-                start_time=start_time,
-                end_time=end_time 
-            )
-            return redirect('calendarapp:calendar')
-        else: 
-            print(forms.errors.as_data())
-    context = {
-        'form': forms
-    }
-    return render(request, 'add_member.html', context)
+    forms = AddProfessorForm(request.POST or None)
+    if request.POST and forms.is_valid():
+        name = forms.cleaned_data['name']
+        course = forms.cleaned_data['course']
+        rank = forms.cleaned_data['rank']
+        print("course", course)
+        Professor.objects.get_or_create(
+            name=name,
+            course__in=course,
+            rank = rank
+        )
+        # prof = Professor(name=name)
+        # prof.save() 
+        # prof.course.add(course) 
+        return redirect('calendarapp:calendar')
+    return render(request, 'add_member.html', {"form": forms})
 
-def assign_professor(request, session_id):
+"""def assign_professor(request, session_id):
     forms = AddProfessorForm()
     if request.method == 'POST':
         forms = AddProfessorForm(request.POST)
@@ -153,7 +184,7 @@ def assign_professor(request, session_id):
     context = {
         'form': forms
     }
-    return render(request, 'add_member.html', context)
+    return render(request, 'add_member.html', context)"""
 
 """def assign_prof_to_session(request, session_id):
     session = Session.objects.get(id=session_id)
@@ -168,6 +199,16 @@ def assign_professor(request, session_id):
     }
     return render
 """
+
+def create_availablity(request):
+    form = DayAvailabilityForm(request.POST or None)
+    if form.is_valid():
+        form.save()
+        form = DayAvailabilityForm()
+    context = {
+        "form": form
+    }
+    return render(request, 'create_availability.html', context)
 
 class EventMemberDeleteView(generic.DeleteView):
     model = Professor
