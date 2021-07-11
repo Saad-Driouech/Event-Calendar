@@ -65,27 +65,29 @@ def check_professor_availability(start_time, end_time, course, professor):
     return 1
 
 def assign_session_to_professor(session):
-    print("in assign professor", type(session))
     professors = Professor.objects.filter(course=session.course).order_by('rank')
     print(professors)
     for prof in professors:
         flag = 1
         print("professor", prof)
-        day = prof.dayavailability_set.all().filter(day=session.start_time.strftime("%w"))
-        if day:
-            if(session.start_time.time() >= day[0].start_time and session.end_time.time() <= day[0].end_time):
-                #temp = (session.start_time.isoweekday()+1)%6 
-                sessions = Session.objects.filter(start_time__date=session.start_time.date(),  professor=prof)
-                print("all sessions", sessions)
-                for sess in sessions:
-                    print("session", sess)
-                    if (sess.start_time.strftime('%H:%M') <= session.start_time.strftime('%H:%M') and session.start_time.strftime('%H:%M') <= sess.end_time.strftime('%H:%M')) or (sess.start_time.strftime('%H:%M') <= session.end_time.strftime('%H:%M') and session.end_time.strftime('%H:%M') <= sess.end_time.strftime('%H:%M')):
-                        print("this session is within the professor's schedule, however it is in a conflict with an already existing session")
+        day_preferences = prof.dayavailability_set.all().filter(day=session.start_time.strftime("%w"))
+        if day_preferences.exists():
+            print("all the preferences of the professor:", day_preferences)
+            for preference in day_preferences:
+                print("the preference of the professor: ", preference)
+                if(session.start_time.time() >= preference.start_time and session.end_time.time() <= preference.end_time):
+                    print("fisrt condition met")
+                    sessions = Session.objects.filter(start_time__date=session.start_time.date(),  professor=prof)
+                    print("all sessions", sessions)
+                    for sess in sessions:
+                        print("session", sess)
+                        if (sess.start_time.strftime('%H:%M') <= session.start_time.strftime('%H:%M') and session.start_time.strftime('%H:%M') <= sess.end_time.strftime('%H:%M')) or (sess.start_time.strftime('%H:%M') <= session.end_time.strftime('%H:%M') and session.end_time.strftime('%H:%M') <= sess.end_time.strftime('%H:%M')):
+                            print("this session is within the professor's schedule, however it is in a conflict with an already existing session")
+                            flag = 0
+                            break
+                else:
+                        print("The professor will not be available during the session")
                         flag = 0
-                        break
-            else:
-                    print("The professor will not be available during the session")
-                    flag = 0
         else:
             print("the professor does not teach in this day")
             flag = 0
@@ -154,7 +156,6 @@ def create_session(request):
             end_time=end_time
         )
         session = Session.objects.get(title=title)
-        print("in create session", type(session))
         flag, professor = assign_session_to_professor(session)
         if flag == 1:
             session.professor = professor
