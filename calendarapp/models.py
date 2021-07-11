@@ -43,7 +43,7 @@ class DayAvailability(models.Model):
     professor = models.ForeignKey(Professor, on_delete=models.CASCADE)
 
     def __str__(self):
-        return str(self.day)
+        return str(self.professor) + ': ' + str(self.get_day_display())
     
 
 class Venue(models.Model):
@@ -54,7 +54,7 @@ class Session(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
     professor = models.ForeignKey(Professor, on_delete=models.CASCADE, blank=True, null=True)
     title = models.CharField(max_length=200, unique=True)
-    description = models.TextField()
+    description = models.TextField(blank=True, null=True)
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
     created_date = models.DateTimeField(auto_now_add=True)
