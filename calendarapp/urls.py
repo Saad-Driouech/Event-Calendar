@@ -12,5 +12,6 @@ urlpatterns = [
     path('event/<int:event_id>/details/', views.session_details, name='event-detail'),
     path('professor/create/', views.create_professor, name='professor_new'),
     path('event/<int:pk>/remove', views.EventMemberDeleteView.as_view(), name="remove_event"),
-    path('availability/create/',views.create_availablity, name='availability_new')
+    path('availability/create/',views.create_availablity, name='availability_new'),
+    path('preference/create/',views.create_preference, name='preference_new'),
 ]
