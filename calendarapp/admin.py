@@ -1,5 +1,5 @@
 from django.contrib import admin
-from calendarapp.models import Course, DayAvailability, Professor, Session, Venue
+from calendarapp.models import Course, DayAvailability, DayPreferences, Professor, Session, Venue
 
 """class EventMemberAdmin(admin.ModelAdmin):
     model = Professor
@@ -10,3 +10,4 @@ admin.site.register(Professor)
 admin.site.register(Course)
 admin.site.register(Venue)
 admin.site.register(DayAvailability)
+admin.site.register(DayPreferences)
