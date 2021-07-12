@@ -1,6 +1,6 @@
 from django.db.models import fields
 from django.forms import ModelForm, DateInput, widgets, TimeInput
-from calendarapp.models import Course, Professor, Session, DayAvailability
+from calendarapp.models import Course, DayPreferences, Professor, Session, DayAvailability
 from django import forms
 
 class SessionForm(ModelForm):
@@ -49,6 +49,23 @@ class DayAvailabilityForm(forms.ModelForm):
 
   def __init__(self, *args, **kwargs):
     super(DayAvailabilityForm, self).__init__(*args, **kwargs)
+    # input_formats to parse HTML5 datetime-local input to datetime field
+    self.fields['start_time'].input_formats = ('%H:%M',)
+    self.fields['end_time'].input_formats = ('%H:%M',)
+
+  
+class DayPreferenceForm(forms.ModelForm):
+  class Meta:
+    model = DayPreferences
+
+    widgets = {
+      'start_time': TimeInput(attrs={'type': 'time'}, format='%H:%M'),
+      'end_time': TimeInput(attrs={'type': 'time'}, format='%H:%M'),
+    }
+    fields= ['professor', 'day', 'start_time', 'end_time']
+
+  def __init__(self, *args, **kwargs):
+    super(DayPreferenceForm, self).__init__(*args, **kwargs)
     # input_formats to parse HTML5 datetime-local input to datetime field
     self.fields['start_time'].input_formats = ('%H:%M',)
     self.fields['end_time'].input_formats = ('%H:%M',)
