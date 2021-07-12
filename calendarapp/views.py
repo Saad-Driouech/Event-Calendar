@@ -14,7 +14,7 @@ from django.urls import reverse_lazy
 
 from .models import *
 from .utils import Calendar
-from .forms import AddProfessorForm, DayAvailabilityForm, SessionForm, AddCourseFrom
+from .forms import AddProfessorForm, DayAvailabilityForm, DayPreferenceForm, SessionForm, AddCourseFrom
 
 @login_required(login_url='signup')
 def index(request):
@@ -65,18 +65,18 @@ def check_professor_availability(start_time, end_time, course, professor):
     return 1
 
 def assign_session_to_professor(session):
+    available_profs = []
     professors = Professor.objects.filter(course=session.course).order_by('rank')
     print(professors)
     for prof in professors:
-        flag = 1
         print("professor", prof)
-        day_preferences = prof.dayavailability_set.all().filter(day=session.start_time.strftime("%w"))
-        if day_preferences.exists():
-            print("all the preferences of the professor:", day_preferences)
-            for preference in day_preferences:
-                print("the preference of the professor: ", preference)
-                if(session.start_time.time() >= preference.start_time and session.end_time.time() <= preference.end_time):
-                    print("fisrt condition met")
+        #getting the intervals when the professor is available in the day
+        day_availabilities = prof.dayavailability_set.all().filter(day=session.start_time.strftime("%w"))
+        if day_availabilities.exists():
+            for availability in day_availabilities:
+                flag = 0
+                if(session.start_time.time() >= availability.start_time and session.end_time.time() <= availability.end_time):
+                    flag = 1
                     sessions = Session.objects.filter(start_time__date=session.start_time.date(),  professor=prof)
                     print("all sessions", sessions)
                     for sess in sessions:
@@ -85,19 +85,33 @@ def assign_session_to_professor(session):
                             print("this session is within the professor's schedule, however it is in a conflict with an already existing session")
                             flag = 0
                             break
+                    if flag == 1:
+                        available_profs.append(prof)
+                    break
+            if flag == 0:
+                print("The professor will not be available during the session")
+            else:
+                day_preferences = prof.daypreferences_set.all().filter(day=session.start_time.strftime("%w"))
+                if day_preferences.exists():
+                    for preference in day_preferences:
+                        if(session.start_time.time() >= preference.start_time and session.end_time.time() <= preference.end_time):
+                            print("the professor prefers to teach at this time")
+                            print("professor", prof.name, "was assigned this session")
+                            return flag, prof
+                    print("The professor does not prefer to teach during this time")
+                    flag = 0
                 else:
-                        print("The professor will not be available during the session")
-                        flag = 0
+                    print("professor", prof.name, "was assigned this session")
+                    return flag, prof
         else:
             print("the professor does not teach in this day")
-            flag = 0
-
-        if flag == 1:
-            print("professor", prof.name, "was assigned this session")
-            return flag, prof
-    return 0, None
-        
-
+    
+    if len(available_profs) != 0:
+        print("the following professers do not prefer to teach at this time, but they are available")
+        for pr in available_profs:
+            print(pr)
+    return 0, None        
+                   
 class CalendarView(LoginRequiredMixin, generic.ListView):
     login_url = 'signup'
     model = Session
@@ -222,6 +236,16 @@ def create_availablity(request):
         "form": form
     }
     return render(request, 'create_availability.html', context)
+
+def create_preference(request):
+    form = DayPreferenceForm(request.POST or None)
+    if form.is_valid():
+        form.save()
+        form = DayPreferenceForm
+    context = {
+        "form": form
+    }
+    return render(request, 'create_preference.html', context)
 
 class EventMemberDeleteView(generic.DeleteView):
     model = Professor
