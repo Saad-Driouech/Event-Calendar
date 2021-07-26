@@ -85,15 +85,14 @@ class Groupe(models.Model):
 class Session(models.Model): 
     course = models.ForeignKey(Course, on_delete=models.CASCADE, blank=True, null=True)
     professor = models.ForeignKey(Professor, on_delete=models.CASCADE, blank=True, null=True)
-    title = models.CharField(max_length=200, unique=True)
-    description = models.TextField(blank=True, null=True)
+    title = models.CharField(max_length=200)
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
     created_date = models.DateTimeField(auto_now_add=True)
     group = models.ForeignKey(Groupe, on_delete=models.CASCADE, default=1)
 
     def __str__(self):
-        return (self.title)
+        return str(self.course) + ' ' + str(self.group.id)
     
     def get_absolute_url(self):
         return reverse('calendarapp:event-detail', args=(self.id,))
@@ -101,4 +100,4 @@ class Session(models.Model):
     @property
     def get_html_url(self):
         url = reverse('calendarapp:event-detail', args=(self.id,))
-        return f'<a href="{url}"> {self.title} </a>'
+        return f'<a href="{url}"> {self.course} {self.group.id} </a>'
