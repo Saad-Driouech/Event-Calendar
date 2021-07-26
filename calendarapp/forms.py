@@ -1,6 +1,6 @@
 from django.db.models import fields
 from django.forms import ModelForm, DateInput, widgets, TimeInput
-from calendarapp.models import Course, DayPreferences, Professor, Session, DayAvailability
+from calendarapp.models import Course, DayPreferences, Groupe, Professor, Session, DayAvailability, Students
 from django import forms
 
 class SessionForm(ModelForm):
@@ -11,15 +11,13 @@ class SessionForm(ModelForm):
       'start_time': DateInput(attrs={'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'),
       'end_time': DateInput(attrs={'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'),
     }
-    fields= ['course', 'title', 'description', 'start_time', 'end_time']
+    fields= ['title', 'description', 'start_time', 'end_time', 'group']
 
   def __init__(self, *args, **kwargs):
     super(SessionForm, self).__init__(*args, **kwargs)
     # input_formats to parse HTML5 datetime-local input to datetime field
     self.fields['start_time'].input_formats = ('%Y-%m-%dT%H:%M',)
     self.fields['end_time'].input_formats = ('%Y-%m-%dT%H:%M',)
-    #self.fields['person'].queryset = Professor.objects.none()
-
 
 class SignupForm(forms.Form):
   username = forms.CharField(widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Username'}))
@@ -36,6 +34,17 @@ class AddCourseFrom(forms.ModelForm):
   class Meta:
     model = Course
     fields = ['title', 'code']
+
+class AddGroupeForm(forms.ModelForm):
+  class Meta:
+    model = Groupe
+    fields = ['name', 'students', 'courses']
+
+class AddStudentsForm(forms.ModelForm):
+  class Meta:
+    model = Students
+    fields = ['name', 'level']
+
 
 class DayAvailabilityForm(forms.ModelForm):
   class Meta:
