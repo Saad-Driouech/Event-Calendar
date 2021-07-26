@@ -40,101 +40,6 @@ def next_month(d):
     month = 'month=' + str(next_month.year) + '-' + str(next_month.month)
     return month
 
-def check_professor_availability(start_time, end_time, course, professor):
-    if(course in professor.course.all()):
-        print("professor teaches course")
-        day = professor.dayavailability_set.all().filter(day=start_time.strftime("%w"))
-        if day:
-            if(start_time.time() >= day[0].start_time and end_time.time() <= day[0].end_time):
-                temp = (start_time.isoweekday()+1)%6 
-                sessions = Session.objects.filter(start_time__week_day=temp,  professor=professor)
-                print("all sessions", sessions)
-                for sess in sessions:
-                    print("session", sess)
-                    if (sess.start_time.strftime('%H:%M') <= start_time.strftime('%H:%M') and start_time.strftime('%H:%M') <= sess.end_time.strftime('%H:%M')) or (sess.start_time.strftime('%H:%M') <= end_time.strftime('%H:%M') and end_time.strftime('%H:%M') <= sess.end_time.strftime('%H:%M')):
-                        print("this session is within the professor's schedule, however it is in a conflict with an already existing session")
-                        return 0
-            else:
-                    print("The professor will not be available during the session")
-                    return 0
-        else:
-            print("the professor does not teach in this day")
-            return 0
-    else:
-        print("Professor doesn't teach the course")
-        return 0
-    return 1
-
-def assign_professor_to_session(session):
-    available_profs = []
-    professors = Professor.objects.filter(course=session.course).order_by('rank')
-    print(professors)
-    for prof in professors:
-        print("professor", prof)
-        day_availabilities = prof.dayavailability_set.all().filter(day=session.start_time.strftime("%w"))
-        if day_availabilities.exists():
-            for availability in day_availabilities:
-                flag = 0
-                if(session.start_time.time() >= availability.start_time and session.end_time.time() <= availability.end_time):
-                    flag = 1
-                    criterion1 = Q(start_time__lte=session.start_time) & Q(end_time__gte=session.start_time)
-                    criterion2 = Q(start_time__lte=session.end_time) & Q(end_time__gte=session.end_time)
-                    sessions = Session.objects.filter(criterion1 | criterion2,  professor=prof)
-                    print("all sessions", sessions)
-                    if sessions.exists():
-                        print("this session is within the professor's schedule, however it is in a conflict with an already existing session")
-                        flag = 0
-                    if flag == 1:
-                        available_profs.append(prof)
-                    break
-            if flag == 0:
-                print("The professor will not be available during the session")
-            else:
-                day_preferences = prof.daypreferences_set.all().filter(day=session.start_time.strftime("%w"))
-                if day_preferences.exists():
-                    for preference in day_preferences:
-                        if(session.start_time.time() >= preference.start_time and session.end_time.time() <= preference.end_time):
-                            print("the professor prefers to teach at this time")
-                            print("professor", prof.name, "was assigned this session")
-                            return flag, prof
-                    print("The professor does not prefer to teach during this time")
-                    flag = 0
-                else:
-                    print("professor", prof.name, "was assigned this session")
-                    return flag, prof
-        else:
-            print("the professor does not teach in this day")
-    
-    if len(available_profs) != 0:
-        print("even though this professor doesn't preder to teach at this time, he was assigned this session")
-        for pr in available_profs:
-            print(pr)
-    return 0, None        
-
-def search_available_groups(session):
-    #should I deal with not giving the session to a group in which there is a student that already is taking this course
-    available_groups = []
-    groups = Groupe.objects.all()
-    criterion1 = Q(start_time__lte=session.start_time) & Q(end_time__gte=session.start_time)
-    criterion2 = Q(start_time__lte=session.end_time) & Q(end_time__gte=session.end_time)
-    for group in groups:
-        flag = 1
-        students = group.students.all()
-        for student in students:
-            #checking for each student if they are in a group that has a session conflicting with this session
-            student_groups =  student.groupe_set.all()
-            for student_group in student_groups:
-                group_sessions = Session.objects.filter(criterion1 | criterion2, group=student_group)
-                if group_sessions.exists():
-                    flag = 0
-                    break
-            if flag == 0:
-                break
-        if flag == 1:
-            available_groups.append(group)
-    
-    return available_groups       
-
 def check_group_availability(group, start_time, end_time):
     students = group.students.all()
     criterion1 = Q(start_time__lte=start_time) & Q(end_time__gte=start_time)
@@ -220,8 +125,6 @@ def assign_course_and_professor_to_session(group, start_time, end_time):
     else:
         print("There is no eligible courses")
     return None, None
-
-#def search_alternative_time_frame()
 
 class CalendarView(LoginRequiredMixin, generic.ListView):
     login_url = 'signup'
