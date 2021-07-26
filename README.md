@@ -1,12 +1,20 @@
 # Django Personal Event Calender
 
 ## How To Setup
-1. Clone This Project `git clone https://github.com/sajib1066/django-eventcalender.git`
-2. Go to Project Directory `cd django-eventcalender`
-3. Create a Virtual Environment `python3 -m venv env`
-4. Activate Virtual Environment `source env/bin/activate`
-5. Install Requirements Package `pip install -r requirements.txt`
-6. Create Migration `python manage.py makemigrations`
-7. Migrate Database `python manage.py migrate`
-8. Create Super User `python manage.py createsuperuser`
-9. Finally Run The Project `python manage.py runserver`
+After cloning, creating, and activating virtual environment, install Requirements Package `pip install -r requirements.txt`
+
+Start by adding students using the "New Student" button. Then create groups using "New group" button.
+
+Create courses using the "New Course" button. Then create professors using the "New Professor" button.
+
+Create availabilities of the professor using "New Availability" button.
+
+Create preferences of the professor using "New Preference" button (if needed).
+
+Create a session using the "New session" buuton. Once you click submit the console will display messages reflecting on what the system is doing and the results.
+
+
+
+## Additional notes:
+It is always a good idea to keep referring to the admin django website to display details about groups, availabilities, and preferences while the system is running. I did not bother to create templates for displaying details since it is not a priority right now. My next priority is to include checking for the availability of the venues.
+Another reason why I did not focus on the front end is because this solution will be integrated with your already existing solution once the back end is fully working.
