@@ -11,10 +11,11 @@ from django.shortcuts import get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
+from django.db.models import Q
 
 from .models import *
 from .utils import Calendar
-from .forms import AddProfessorForm, DayAvailabilityForm, DayPreferenceForm, SessionForm, AddCourseFrom
+from .forms import AddGroupeForm, AddProfessorForm, AddStudentsForm, DayAvailabilityForm, DayPreferenceForm, SessionForm, AddCourseFrom
 
 @login_required(login_url='signup')
 def index(request):
@@ -64,27 +65,25 @@ def check_professor_availability(start_time, end_time, course, professor):
         return 0
     return 1
 
-def assign_session_to_professor(session):
+def assign_professor_to_session(session):
     available_profs = []
     professors = Professor.objects.filter(course=session.course).order_by('rank')
     print(professors)
     for prof in professors:
         print("professor", prof)
-        #getting the intervals when the professor is available in the day
         day_availabilities = prof.dayavailability_set.all().filter(day=session.start_time.strftime("%w"))
         if day_availabilities.exists():
             for availability in day_availabilities:
                 flag = 0
                 if(session.start_time.time() >= availability.start_time and session.end_time.time() <= availability.end_time):
                     flag = 1
-                    sessions = Session.objects.filter(start_time__date=session.start_time.date(),  professor=prof)
+                    criterion1 = Q(start_time__lte=session.start_time) & Q(end_time__gte=session.start_time)
+                    criterion2 = Q(start_time__lte=session.end_time) & Q(end_time__gte=session.end_time)
+                    sessions = Session.objects.filter(criterion1 | criterion2,  professor=prof)
                     print("all sessions", sessions)
-                    for sess in sessions:
-                        print("session", sess)
-                        if (sess.start_time.strftime('%H:%M') <= session.start_time.strftime('%H:%M') and session.start_time.strftime('%H:%M') <= sess.end_time.strftime('%H:%M')) or (sess.start_time.strftime('%H:%M') <= session.end_time.strftime('%H:%M') and session.end_time.strftime('%H:%M') <= sess.end_time.strftime('%H:%M')):
-                            print("this session is within the professor's schedule, however it is in a conflict with an already existing session")
-                            flag = 0
-                            break
+                    if sessions.exists():
+                        print("this session is within the professor's schedule, however it is in a conflict with an already existing session")
+                        flag = 0
                     if flag == 1:
                         available_profs.append(prof)
                     break
@@ -107,11 +106,115 @@ def assign_session_to_professor(session):
             print("the professor does not teach in this day")
     
     if len(available_profs) != 0:
-        print("the following professers do not prefer to teach at this time, but they are available")
+        print("even though this professor doesn't preder to teach at this time, he was assigned this session")
         for pr in available_profs:
             print(pr)
     return 0, None        
-                   
+
+def search_available_groups(session):
+    #should I deal with not giving the session to a group in which there is a student that already is taking this course
+    available_groups = []
+    groups = Groupe.objects.all()
+    criterion1 = Q(start_time__lte=session.start_time) & Q(end_time__gte=session.start_time)
+    criterion2 = Q(start_time__lte=session.end_time) & Q(end_time__gte=session.end_time)
+    for group in groups:
+        flag = 1
+        students = group.students.all()
+        for student in students:
+            #checking for each student if they are in a group that has a session conflicting with this session
+            student_groups =  student.groupe_set.all()
+            for student_group in student_groups:
+                group_sessions = Session.objects.filter(criterion1 | criterion2, group=student_group)
+                if group_sessions.exists():
+                    flag = 0
+                    break
+            if flag == 0:
+                break
+        if flag == 1:
+            available_groups.append(group)
+    
+    return available_groups       
+
+def check_group_availability(group, start_time, end_time):
+    students = group.students.all()
+    criterion1 = Q(start_time__lte=start_time) & Q(end_time__gte=start_time)
+    criterion2 = Q(start_time__lte=end_time) & Q(end_time__gte=end_time)
+    for student in students:
+        #checking for each student if they are in a group that has a session conflicting with this session
+        student_groups =  student.groupe_set.all()
+        for student_group in student_groups:
+            group_sessions = Session.objects.filter(criterion1 | criterion2, group=student_group)
+            if group_sessions.exists():
+                print("Student: ", student, " has another session with group: ", student_group, " during this time")
+                return 0
+    return 1
+
+def check_course_eligibility(group):
+    eligible_courses = []
+    group_courses = group.courses.all()
+    #filtering through eligible courses leaving only courses that are not taken by any students in another session
+    for group_course in group_courses:
+        print("course being tested: ", group_course)
+        flag = 1
+        students = group.students.all()
+        for student in students:
+            student_groups = student.groupe_set.all()
+            for student_group in student_groups:
+                if Session.objects.filter(group=student_group, course=group_course).exists():
+                    print(student, "has already a session of", group_course, "with ", student_group)
+                    flag = 0
+                    break
+            if flag == 0:
+                break
+            else:
+                if not group_course in eligible_courses:
+                    eligible_courses.append(group_course)
+    return eligible_courses
+
+def assign_course_and_professor_to_session(group, start_time, end_time):
+    available_prof = None
+    prof_course = None
+    criterion1 = Q(start_time__lte=start_time) & Q(end_time__gte=start_time)
+    criterion2 = Q(start_time__lte=end_time) & Q(end_time__gte=end_time)
+    eligible_courses = check_course_eligibility(group)
+    print("eligible courses: ", eligible_courses)
+    if len(eligible_courses) > 0:
+        for eligible_course in eligible_courses:
+            print("current eligible course: ", eligible_course)
+            professors = Professor.objects.filter(course=eligible_course).order_by('rank')
+            print(professors)
+            if professors.exists():
+                for prof in professors:
+                    print("professor: ", prof)
+                    day_availabilities = prof.dayavailability_set.all().filter(day=start_time.strftime("%w"), start_time__lte=start_time.time(), end_time__gte=end_time.time())
+                    if day_availabilities.exists():
+                        prof_sessions = Session.objects.filter(criterion1 | criterion2,  professor=prof)
+                        print("conflicting sessions: ", prof_sessions)
+                        if prof_sessions.exists():
+                            print("this session is within the professor's schedule, however it is in a conflict with an already existing session")
+                        else:
+                            available_prof = prof
+                            prof_course = eligible_course
+                            day_preferences = prof.daypreferences_set.all().filter(day=start_time.strftime("%w"), start_time__lte=start_time.time(), end_time__gte=end_time.time())
+                            if day_preferences.exists():
+                                print("the professor prefers to teach at this time")
+                                print("professor", prof.name, "was assigned this session")
+                                return prof, eligible_course
+                            else:
+                                print("The professor does not prefer to teach during this time")          
+                    else:
+                        print("the professor does not teach at this time")
+            
+                if available_prof != None:
+                    return available_prof, prof_course
+            else:
+                print("No professor teaches this course")
+            if eligible_course == eligible_courses[-1]:
+                print("there is a list of eligible professors. However, either none of them is available or some courses does not have a professor attributed")
+    else:
+        print("There is no eligible courses")
+    return None, None
+
 class CalendarView(LoginRequiredMixin, generic.ListView):
     login_url = 'signup'
     model = Session
@@ -128,55 +231,34 @@ class CalendarView(LoginRequiredMixin, generic.ListView):
         context['next_month'] = next_month(d)
         return context
 
-# @login_required(login_url='signup')
-# def create_session(request):    
-#     form = SessionForm(request.POST or None)
-#     if request.POST and form.is_valid():
-#         title = form.cleaned_data['title']
-#         description = form.cleaned_data['description']
-#         start_time = form.cleaned_data['start_time']
-#         end_time = form.cleaned_data['end_time']
-#         course = form.cleaned_data["course"]
-#         professor = form.cleaned_data['professor']
-#         flag = check_professor_availability(start_time, end_time, course, professor)
-#         if flag == 1:
-#             print("there is no conflict with any of the professor's sessions")
-#             Session.objects.get_or_create(
-#                 course=course,
-#                 professor=professor,
-#                 title=title,
-#                 description=description,
-#                 start_time=start_time,
-#                 end_time=end_time
-#             )
-#             return HttpResponseRedirect(reverse('calendarapp:calendar'))
-#     return render(request, 'event.html', {'form': form})
-
 @login_required(login_url='signup')
 def create_session(request):    
     form = SessionForm(request.POST or None)
     if request.POST and form.is_valid():
         title = form.cleaned_data['title']
         description = form.cleaned_data['description']
-        start_time = form.cleaned_data['start_time']
-        end_time = form.cleaned_data['end_time']
-        course = form.cleaned_data["course"]
-
-        Session.objects.get_or_create(
-            course=course,
-            title=title,
-            description=description,
-            start_time=start_time,
-            end_time=end_time
-        )
-        session = Session.objects.get(title=title)
-        flag, professor = assign_session_to_professor(session)
+        start_time = form.cleaned_data["start_time"]
+        end_time = form.cleaned_data["end_time"]
+        group = form.cleaned_data["group"]
+        flag = check_group_availability(group, start_time, end_time)
         if flag == 1:
-            session.professor = professor
-            session.save()
-            print("Successful assignment")
-        else: 
-            print("no professor was assigned to session")
+            print("all students in this group are available")
+            professor, course = assign_course_and_professor_to_session(group, start_time, end_time)
+            if professor != None:
+                Session.objects.get_or_create(
+                    title=title,
+                    description=description,
+                    start_time= start_time,
+                    end_time= end_time,
+                    group = group,
+                    professor = professor,
+                    course = course,
+                )
+                print("Session created successfully")
+            else: 
+                print("No professor is available during this time")
+        else:
+            print("not all students in this group are available")
         return HttpResponseRedirect(reverse('calendarapp:calendar'))
     return render(request, 'event.html', {'form': form})
 
@@ -193,6 +275,32 @@ def create_course(request):
         return HttpResponseRedirect(reverse('calendarapp:calendar'))
     return render(request, "course.html", {"form": form})
 
+def create_student(request):
+    form = AddStudentsForm(request.POST or None)
+    if request.POST and form.is_valid():
+        name=form.cleaned_data['name']
+        level=form.cleaned_data['level']
+        Students.objects.get_or_create(
+            name=name,
+            level=level
+        )
+        return HttpResponseRedirect(reverse('calendarapp:calendar'))
+    return render(request, "add_student.html", {"form": form})
+
+def create_groupe(request):
+    form = AddGroupeForm(request.POST or None)
+    if request.POST and form.is_valid():
+        name=form.cleaned_data['name']
+        students=form.cleaned_data['students']
+        courses=form.cleaned_data['courses']
+        groupe = Groupe(name=name)
+        groupe.save()
+        for student in students:
+            groupe.students.add(student)
+        for course in courses:
+            groupe.courses.add(course)
+        return HttpResponseRedirect(reverse('calendarapp:calendar'))
+    return render(request, "add_groupe.html", {"form": form})
 
 class SessionEdit(generic.UpdateView):
     model = Session
@@ -213,17 +321,12 @@ def create_professor(request):
     forms = AddProfessorForm(request.POST or None)
     if request.POST and forms.is_valid():
         name = forms.cleaned_data['name']
-        course = forms.cleaned_data['course']
+        courses = forms.cleaned_data['course']
         rank = forms.cleaned_data['rank']
-        print("course", course)
-        Professor.objects.get_or_create(
-            name=name,
-            course__in=course,
-            rank = rank
-        )
-        # prof = Professor(name=name)
-        # prof.save() 
-        # prof.course.add(course) 
+        prof = Professor(name=name, rank=rank)
+        prof.save() 
+        for course in courses:
+            prof.course.add(course) 
         return redirect('calendarapp:calendar')
     return render(request, 'add_member.html', {"form": forms})
 
