@@ -140,8 +140,6 @@ class CalendarView(LoginRequiredMixin, generic.ListView):
 def create_session(request):    
     form = SessionForm(request.POST or None)
     if request.POST and form.is_valid():
-        title = form.cleaned_data['title']
-        description = form.cleaned_data['description']
         start_time = form.cleaned_data["start_time"]
         end_time = form.cleaned_data["end_time"]
         group = form.cleaned_data["group"]
@@ -151,8 +149,7 @@ def create_session(request):
             professor, course = assign_course_and_professor_to_session(group, start_time, end_time)
             if professor != None:
                 Session.objects.get_or_create(
-                    title=title,
-                    description=description,
+                    title=str(course) + ' ' + str(group.id),
                     start_time= start_time,
                     end_time= end_time,
                     group = group,
