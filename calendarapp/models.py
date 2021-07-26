@@ -2,7 +2,7 @@ from datetime import datetime
 from django.db import models
 from django.db.models.fields.related import ManyToManyField
 from django.urls import reverse
-from django.contrib.auth.models import User
+from django.contrib.auth.models import GroupManager, User
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
@@ -61,21 +61,36 @@ class DayAvailability(models.Model):
     professor = models.ForeignKey(Professor, on_delete=models.CASCADE)
 
     def __str__(self):
-        return str(self.professor) + ': ' + str(self.get_day_display())
-    
+        return str(self.professor) + ': ' + str(self.get_day_display()) 
 
 class Venue(models.Model):
     location = models.CharField(max_length=50)
     courses = models.ManyToManyField(Course)
 
-class Session(models.Model):
-    course = models.ForeignKey(Course, on_delete=models.CASCADE)
+class Students(models.Model):
+    name = models.CharField(max_length=50)
+    level = models.CharField(max_length=50, blank=True, null=True)
+    
+    def __str__(self):
+        return str(self.name)
+    
+class Groupe(models.Model):
+    name = models.CharField(max_length=50)
+    students = models.ManyToManyField(Students)
+    courses = models.ManyToManyField(Course)
+
+    def __str__(self):
+        return str(self.name)
+
+class Session(models.Model): 
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, blank=True, null=True)
     professor = models.ForeignKey(Professor, on_delete=models.CASCADE, blank=True, null=True)
     title = models.CharField(max_length=200, unique=True)
     description = models.TextField(blank=True, null=True)
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
     created_date = models.DateTimeField(auto_now_add=True)
+    group = models.ForeignKey(Groupe, on_delete=models.CASCADE, default=1)
 
     def __str__(self):
         return (self.title)
@@ -87,10 +102,3 @@ class Session(models.Model):
     def get_html_url(self):
         url = reverse('calendarapp:event-detail', args=(self.id,))
         return f'<a href="{url}"> {self.title} </a>'
-
-    """def validate_professor(self):
-        professors = Professor.filter(course=self.course)
-        if self.professor not in professors:
-            raise ValidationError(
-                _('The professor you chose does not teach this course'),
-            )"""
