@@ -149,7 +149,7 @@ def check_group_availability(group, start_time, end_time):
                 return 0
     return 1
 
-def check_course_eligibility(group):
+def check_course_eligibility(group, start_time):
     eligible_courses = []
     group_courses = group.courses.all()
     #filtering through eligible courses leaving only courses that are not taken by any students in another session
@@ -160,10 +160,16 @@ def check_course_eligibility(group):
         for student in students:
             student_groups = student.groupe_set.all()
             for student_group in student_groups:
-                if Session.objects.filter(group=student_group, course=group_course).exists():
-                    print(student, "has already a session of", group_course, "with ", student_group)
-                    flag = 0
-                    break
+                if student_group == group:
+                    if Session.objects.filter(group=student_group, course=group_course, start_time__date=start_time.date()).exists():
+                        print("This group has already a session of this course in this date")
+                        flag = 0
+                        break
+                else:
+                    if Session.objects.filter(group=student_group, course=group_course).exists():
+                        print(student, "has already a session of", group_course, "with ", student_group)
+                        flag = 0
+                        break
             if flag == 0:
                 break
             else:
@@ -176,7 +182,7 @@ def assign_course_and_professor_to_session(group, start_time, end_time):
     prof_course = None
     criterion1 = Q(start_time__lte=start_time) & Q(end_time__gte=start_time)
     criterion2 = Q(start_time__lte=end_time) & Q(end_time__gte=end_time)
-    eligible_courses = check_course_eligibility(group)
+    eligible_courses = check_course_eligibility(group, start_time)
     print("eligible courses: ", eligible_courses)
     if len(eligible_courses) > 0:
         for eligible_course in eligible_courses:
@@ -215,6 +221,8 @@ def assign_course_and_professor_to_session(group, start_time, end_time):
         print("There is no eligible courses")
     return None, None
 
+#def search_alternative_time_frame()
+
 class CalendarView(LoginRequiredMixin, generic.ListView):
     login_url = 'signup'
     model = Session
@@ -235,8 +243,6 @@ class CalendarView(LoginRequiredMixin, generic.ListView):
 def create_session(request):    
     form = SessionForm(request.POST or None)
     if request.POST and form.is_valid():
-        title = form.cleaned_data['title']
-        description = form.cleaned_data['description']
         start_time = form.cleaned_data["start_time"]
         end_time = form.cleaned_data["end_time"]
         group = form.cleaned_data["group"]
@@ -246,8 +252,7 @@ def create_session(request):
             professor, course = assign_course_and_professor_to_session(group, start_time, end_time)
             if professor != None:
                 Session.objects.get_or_create(
-                    title=title,
-                    description=description,
+                    title=str(course) + ' ' + str(group.id),
                     start_time= start_time,
                     end_time= end_time,
                     group = group,
