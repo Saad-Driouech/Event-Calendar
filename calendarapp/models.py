@@ -7,11 +7,34 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 class Course(models.Model):
+    VENUE_CHOICES = (
+        ('1', 'Classroom'),
+        ('2', 'IT'),
+        ('3', 'Auditorium'),
+        ('4', 'Conference Room'),
+        ('5', 'Laboratory'),
+    )
     title = models.CharField(max_length=50, unique=True)
     code = models.CharField(max_length=10, unique=True)
+    venue_type = models.CharField(max_length=20, choices=VENUE_CHOICES, default=1)
 
     def __str__(self):
         return str(self.title)
+
+class Venue(models.Model):
+    VENUE_CHOICES = (
+        ('1', 'Classroom'),
+        ('2', 'IT'),
+        ('3', 'Auditorium'),
+        ('4', 'Conference Room'),
+        ('5', 'Laboratory'),
+    )
+    name = models.CharField(max_length=50)
+    type = models.CharField(max_length=20, choices=VENUE_CHOICES, default=1)
+    capacity = models.IntegerField()
+
+    def __str__(self):
+        return str(self.name)
 
 class Professor(models.Model):
     RANK_CHOICES = (
@@ -63,10 +86,6 @@ class DayAvailability(models.Model):
     def __str__(self):
         return str(self.professor) + ': ' + str(self.get_day_display()) 
 
-class Venue(models.Model):
-    location = models.CharField(max_length=50)
-    courses = models.ManyToManyField(Course)
-
 class Students(models.Model):
     name = models.CharField(max_length=50)
     level = models.CharField(max_length=50, blank=True, null=True)
@@ -90,14 +109,15 @@ class Session(models.Model):
     end_time = models.DateTimeField()
     created_date = models.DateTimeField(auto_now_add=True)
     group = models.ForeignKey(Groupe, on_delete=models.CASCADE, default=1)
+    venue = models.ForeignKey(Venue, on_delete=models.CASCADE, default=1)
 
     def __str__(self):
         return str(self.course) + ' ' + str(self.group.id)
     
     def get_absolute_url(self):
-        return reverse('calendarapp:event-detail', args=(self.id,))
+        return reverse('calendarapp:session-detail', args=(self.id,))
 
     @property
     def get_html_url(self):
-        url = reverse('calendarapp:event-detail', args=(self.id,))
+        url = reverse('calendarapp:session-detail', args=(self.id,))
         return f'<a href="{url}"> {self.course} {self.group.id} </a>'
