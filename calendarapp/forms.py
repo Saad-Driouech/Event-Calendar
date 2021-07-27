@@ -1,6 +1,6 @@
 from django.db.models import fields
 from django.forms import ModelForm, DateInput, widgets, TimeInput
-from calendarapp.models import Course, DayPreferences, Groupe, Professor, Session, DayAvailability, Students
+from calendarapp.models import Course, DayPreferences, Groupe, Professor, Session, DayAvailability, Students, Venue
 from django import forms
 
 class SessionForm(ModelForm):
@@ -33,7 +33,12 @@ class AddProfessorForm(forms.ModelForm):
 class AddCourseFrom(forms.ModelForm):
   class Meta:
     model = Course
-    fields = ['title', 'code']
+    fields = ['title', 'code', 'venue_type']
+
+class AddVenueFrom(forms.ModelForm):
+  class Meta:
+    model = Venue
+    fields = ['name', 'type', 'capacity']
 
 class AddGroupeForm(forms.ModelForm):
   class Meta:
