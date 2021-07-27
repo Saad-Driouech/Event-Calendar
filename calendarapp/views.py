@@ -15,7 +15,7 @@ from django.db.models import Q
 
 from .models import *
 from .utils import Calendar
-from .forms import AddGroupeForm, AddProfessorForm, AddStudentsForm, DayAvailabilityForm, DayPreferenceForm, SessionForm, AddCourseFrom
+from .forms import AddGroupeForm, AddProfessorForm, AddStudentsForm, AddVenueFrom, DayAvailabilityForm, DayPreferenceForm, SessionForm, AddCourseFrom
 
 @login_required(login_url='signup')
 def index(request):
@@ -87,7 +87,7 @@ def assign_course_and_professor_to_session(group, start_time, end_time):
         for eligible_course in eligible_courses:
             print("current eligible course: ", eligible_course)
             professors = Professor.objects.filter(course=eligible_course).order_by('rank')
-            print(professors)
+            print("Professors who teach this course", professors)
             if professors.exists():
                 for prof in professors:
                     print("professor: ", prof)
@@ -111,6 +111,7 @@ def assign_course_and_professor_to_session(group, start_time, end_time):
                         print("the professor does not teach at this time")
             
                 if available_prof != None:
+                    print("professor", prof.name, "was assigned this session")
                     return available_prof, prof_course
             else:
                 print("No professor teaches this course")
@@ -119,6 +120,24 @@ def assign_course_and_professor_to_session(group, start_time, end_time):
     else:
         print("There is no eligible courses")
     return None, None
+
+def check_venue_availability(group, course, start_time, end_time):
+    number_students = group.students.all().count()
+    criterion1 = Q(start_time__lte=start_time) & Q(end_time__gte=start_time)
+    criterion2 = Q(start_time__lte=end_time) & Q(end_time__gte=end_time)
+    eligible_venues = Venue.objects.filter(capacity__gte=number_students, type=course.venue_type).order_by("capacity")
+    if eligible_venues.exists():
+        print("Eligble venues: ", eligible_venues)
+        for eligible_venue in eligible_venues:
+            sessions_in_venue = Session.objects.filter(criterion1 | criterion2, venue=eligible_venue)
+            if not sessions_in_venue.exists():
+                print("This session will be held in this venue:", eligible_venue)
+                return eligible_venue
+        print("All the venues in which this session can be held will not be available during the time of the session")
+        return None
+    else:
+        print("There is no venue wherein this session can be hold")
+        return None
 
 class CalendarView(LoginRequiredMixin, generic.ListView):
     login_url = 'signup'
@@ -148,21 +167,26 @@ def create_session(request):
             print("all students in this group are available")
             professor, course = assign_course_and_professor_to_session(group, start_time, end_time)
             if professor != None:
-                Session.objects.get_or_create(
-                    title=str(course) + ' ' + str(group.id),
-                    start_time= start_time,
-                    end_time= end_time,
-                    group = group,
-                    professor = professor,
-                    course = course,
-                )
-                print("Session created successfully")
+                venue = check_venue_availability(group, course, start_time, end_time)
+                if venue != None:
+                    Session.objects.get_or_create(
+                        title=str(course) + ' ' + str(group.id),
+                        start_time= start_time,
+                        end_time= end_time,
+                        group = group,
+                        professor = professor,
+                        course = course,
+                        venue = venue
+                    )
+                    print("Session created successfully")
+                else:
+                    print("No venue is available during this time")
             else: 
                 print("No professor is available during this time")
         else:
             print("not all students in this group are available")
         return HttpResponseRedirect(reverse('calendarapp:calendar'))
-    return render(request, 'event.html', {'form': form})
+    return render(request, 'session.html', {'form': form})
 
 @login_required(login_url='singup')
 def create_course(request):
@@ -170,12 +194,14 @@ def create_course(request):
     if request.POST and form.is_valid():
         title=form.cleaned_data['title']
         code=form.cleaned_data['code']
+        venue_type=form.cleaned_data['venue_type']
         Course.objects.get_or_create(
             title=title,
-            code=code
+            code=code,
+            venue_type=venue_type
         )
         return HttpResponseRedirect(reverse('calendarapp:calendar'))
-    return render(request, "course.html", {"form": form})
+    return render(request, "add_course.html", {"form": form})
 
 def create_student(request):
     form = AddStudentsForm(request.POST or None)
@@ -204,20 +230,35 @@ def create_groupe(request):
         return HttpResponseRedirect(reverse('calendarapp:calendar'))
     return render(request, "add_groupe.html", {"form": form})
 
+@login_required(login_url='singup')
+def create_venue(request):
+    form = AddVenueFrom(request.POST or None)
+    if request.POST and form.is_valid():
+        name=form.cleaned_data['name']
+        type=form.cleaned_data['type']
+        capacity=form.cleaned_data['capacity']
+        Venue.objects.get_or_create(
+            name=name,
+            type=type,
+            capacity=capacity
+        )
+        return HttpResponseRedirect(reverse('calendarapp:calendar'))
+    return render(request, "add_venue.html", {"form": form})
+
 class SessionEdit(generic.UpdateView):
     model = Session
-    fields = ['professor', 'course', 'title', 'description', 'start_time', 'end_time']
-    template_name = 'event.html'
+    fields = ['professor', 'course', 'title', 'start_time', 'end_time', 'group', 'venue']
+    template_name = 'session.html'
 
 @login_required(login_url='signup')
-def session_details(request, event_id):
-    session = Session.objects.get(id=event_id)
+def session_details(request, session_id):
+    session = Session.objects.get(id=session_id)
     professor = Professor.objects.filter(session=session)
     context = {
-        'event': session,
+        'session': session,
         'professor': professor
     }
-    return render(request, 'event-details.html', context)
+    return render(request, 'session-details.html', context)
 
 def create_professor(request):
     forms = AddProfessorForm(request.POST or None)
