@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Session Details
+{% endblock %}
+
+{% block content %}
+    <div class="container">
+        <div class="clearfix">
+            <a class="btn btn-primary left" href="{% url 'calendarapp:calendar' %}"> Calendar </a>
+            <a class="btn btn-info right mr-2" href="{% url 'calendarapp:session_edit' session.pk %}"> Edit Session </a>
+        </div>
+        
+        <div class="clearfix">
+            <h3>Session Name: {{ session.title }}</h3>
+            <p>From <span style="color: gray;">{{ session.start_time }}</span> To <span style="color: gray;">{{ session.end_time }}</span></p>
+            <hr>
+        </div>
+        <hr>
+        <div class="clearfix">
+            <h4 class="left" > Professor of this Session: {{ session.professor }} </h4>
+            <h4 class="left" > Venue of this session: {{ session.venue }} </h4>
+        </div>
+    </div>
+{% endblock %}
